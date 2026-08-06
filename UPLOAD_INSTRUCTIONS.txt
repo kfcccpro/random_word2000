@@ -1,8 +1,4 @@
-GitHub 저장소 kfcccpro.github.io의 루트에 다음 3개 파일을 업로드하세요.
-
-1. index.html
-2. wordmaster-preview-v3.png
-3. .nojekyll
-
-기존 index.html은 교체하고, 이미지 파일은 반드시 같은 위치에 두십시오.
-배포 후 새 링크로 https://kfcccpro.github.io/?v=3 을 공유해 미리보기를 다시 생성하십시오.
+1) Firebase Anonymous 인증을 켭니다.
+2) 제공된 v7 Realtime Database Rules를 게시합니다.
+3) 이 폴더의 index.html과 wordmaster-preview-v3.png를 GitHub 저장소 최상위에 업로드합니다.
+4) 기존 진도가 있는 아이패드에서 먼저 한 번 접속한 다음 PC에서 접속합니다.
