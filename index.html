@@ -204,15 +204,16 @@ const SEMANTIC_RULES=[
 ];
 
 
-function defaultState(){return{version:8,createdAt:new Date().toISOString(),settings:{dailyCount:80,enKoPercent:100},meta:{legacyImported:false,updatedAt:new Date().toISOString(),build:'wm-v8-20260811'},wrongDb:{},reviewDb:{},wordStats:{},dailySets:{},dailyResults:{},startReviewDone:{},startReviewedSources:{},endReviewDone:{},history:[]}}
+function defaultState(){return{version:8,createdAt:new Date().toISOString(),settings:{dailyCount:99,enKoPercent:100},meta:{legacyImported:false,daily99Migrated:true,updatedAt:new Date().toISOString(),build:'wm-v8-20260811'},wrongDb:{},reviewDb:{},wordStats:{},dailySets:{},dailyResults:{},startReviewDone:{},startReviewedSources:{},endReviewDone:{},history:[]}}
 
 function normalizeState(s){
   const d=defaultState();if(!s||typeof s!=='object')s=d;
   for(const k of Object.keys(d))if(s[k]===undefined)s[k]=d[k];
-  if(!s.settings||typeof s.settings!=='object')s.settings={dailyCount:80,enKoPercent:100};
+  if(!s.settings||typeof s.settings!=='object')s.settings={dailyCount:99,enKoPercent:100};
   s.settings.dailyCount=clamp(parseInt(s.settings.dailyCount,10)||0,0,150);
   s.settings.enKoPercent=clamp(parseInt(s.settings.enKoPercent,10),0,100);if(Number.isNaN(s.settings.enKoPercent))s.settings.enKoPercent=100;
   if(!s.meta)s.meta={legacyImported:false,updatedAt:new Date().toISOString(),build:'v8'};
+  if(s.meta.daily99Migrated!==true){s.settings.dailyCount=99;s.meta.daily99Migrated=true}
   if(!s.meta.updatedAt)s.meta.updatedAt=s.createdAt||new Date().toISOString();
   s.meta.build='v8';
   if(!Array.isArray(s.history))s.history=[];
@@ -684,7 +685,7 @@ function startExtraSession(){
 
 function renderWrong(){
   const root=document.getElementById('viewWrong'),ids=reviewIdsFor(S,true).sort((a,b)=>String(S.reviewDb[a]?.dueDate||'').localeCompare(String(S.reviewDb[b]?.dueDate||''))||(S.wrongDb[b]?.count||0)-(S.wrongDb[a]?.count||0)),active=ids.length,stable=stableReviewCountFor(),historical=wrongCount();
-  root.innerHTML=`<div class="grid g3" style="margin-bottom:15px"><div class="card"><div class="stat-label">현재 복습 필요</div><div class="stat-value red">${active}</div><div class="stat-note">오늘은 최대 20개만 자동 출제</div></div><div class="card"><div class="stat-label">안정화 완료</div><div class="stat-value">${stable}</div><div class="stat-note">D+1 · D+3 · D+6 확인 통과</div></div><div class="card"><div class="stat-label">과거 오답 이력</div><div class="stat-value">${historical}</div><div class="stat-note">현재 실력과 분리해 보관</div></div></div><div class="card"><div class="section-head"><div><div class="section-title">복습이 필요한 단어</div><div class="section-sub">별도 암기 단계 없이 오늘 학습 80개 안에서 자동으로 다시 출제됩니다.</div></div><input class="search" id="wrongSearch" placeholder="단어 또는 뜻 검색" oninput="filterWrong()"></div><div id="wrongList"></div></div>`;wrongPage=1;drawWrongList(ids,'')
+  root.innerHTML=`<div class="grid g3" style="margin-bottom:15px"><div class="card"><div class="stat-label">현재 복습 필요</div><div class="stat-value red">${active}</div><div class="stat-note">오늘은 최대 20개만 자동 출제</div></div><div class="card"><div class="stat-label">안정화 완료</div><div class="stat-value">${stable}</div><div class="stat-note">D+1 · D+3 · D+6 확인 통과</div></div><div class="card"><div class="stat-label">과거 오답 이력</div><div class="stat-value">${historical}</div><div class="stat-note">현재 실력과 분리해 보관</div></div></div><div class="card"><div class="section-head"><div><div class="section-title">복습이 필요한 단어</div><div class="section-sub">별도 암기 단계 없이 오늘 학습 99개 안에서 자동으로 다시 출제됩니다.</div></div><input class="search" id="wrongSearch" placeholder="단어 또는 뜻 검색" oninput="filterWrong()"></div><div id="wrongList"></div></div>`;wrongPage=1;drawWrongList(ids,'')
 }
 function filterWrong(){wrongPage=1;const q=document.getElementById('wrongSearch').value.trim().toLowerCase(),ids=reviewIdsFor(S,true).filter(id=>{const w=BY_ID[id];return w.word.toLowerCase().includes(q)||w.mean.toLowerCase().includes(q)}).sort((a,b)=>String(S.reviewDb[a]?.dueDate||'').localeCompare(String(S.reviewDb[b]?.dueDate||''))||(S.wrongDb[b]?.count||0)-(S.wrongDb[a]?.count||0));drawWrongList(ids,q)}
 function drawWrongList(ids,q){const per=50,pages=Math.max(1,Math.ceil(ids.length/per));wrongPage=clamp(wrongPage,1,pages);const slice=ids.slice((wrongPage-1)*per,wrongPage*per),box=document.getElementById('wrongList');if(!box)return;if(!slice.length){box.innerHTML=`<div class="empty"><div class="empty-icon">○</div>${q?'검색 결과가 없습니다.':'현재 복습이 필요한 단어가 없습니다.'}</div>`;return}box.innerHTML=`<div class="list">${slice.map(id=>{const w=BY_ID[id],r=S.wrongDb[id]||{},v=S.reviewDb[id]||{},step=(v.stage||0)===0?'D+1':v.stage===1?'D+3':'D+6';return`<div class="word-row"><div class="w">${escapeHtml(w.word)}</div><div class="m">${escapeHtml(w.mean)}</div><div class="c">${step}</div><div class="d">예정 ${escapeHtml(v.dueDate||'-')} · 오답 ${r.count||0}회</div></div>`}).join('')}</div><div class="pager"><button class="btn btn-secondary small" onclick="changeWrongPage(-1)" ${wrongPage===1?'disabled':''}>이전</button><span>${wrongPage} / ${pages}</span><button class="btn btn-secondary small" onclick="changeWrongPage(1)" ${wrongPage===pages?'disabled':''}>다음</button></div>`;box.dataset.ids=ids.join(',')}
