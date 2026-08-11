@@ -1,0 +1,36 @@
+name: WordMaster v8 review-plan fix
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/wordmaster-v8-review-plan-fix.yml
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python tools/fix_wordmaster_v8_review_plan.py
+      - name: Validate
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          h=Path('index.html').read_text(encoding='utf-8')
+          for x in ['reviewPlanVersion!==8','reviewPlanVersion:8','Math.min(20,target)','showWrongMemory','touch-action:manipulation']:
+            if x not in h: raise SystemExit('missing '+x)
+          scripts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',h,flags=re.S)
+          Path('/tmp/main.js').write_text(scripts[-1],encoding='utf-8')
+          PY
+          node --check /tmp/main.js
+          git diff --check
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Fix v8 review plan for unstarted legacy daily sets'
+          git push origin HEAD:main
