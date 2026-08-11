@@ -1,0 +1,85 @@
+name: Apply WordMaster daily 99
+
+on:
+  push:
+    paths:
+      - '.github/workflows/wordmaster-daily99.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch daily count to 99
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          replacements = [
+              ("settings:{dailyCount:80,enKoPercent:100},meta:{legacyImported:false,updatedAt:new Date().toISOString(),build:'wm-v8-20260811'}",
+               "settings:{dailyCount:99,enKoPercent:100},meta:{legacyImported:false,daily99Migrated:true,updatedAt:new Date().toISOString(),build:'wm-v8-20260811'}"),
+              ("if(!s.settings||typeof s.settings!=='object')s.settings={dailyCount:80,enKoPercent:100};",
+               "if(!s.settings||typeof s.settings!=='object')s.settings={dailyCount:99,enKoPercent:100};"),
+              ("if(!s.meta)s.meta={legacyImported:false,updatedAt:new Date().toISOString(),build:'v8'};",
+               "if(!s.meta)s.meta={legacyImported:false,updatedAt:new Date().toISOString(),build:'v8'};\n  if(s.meta.daily99Migrated!==true){s.settings.dailyCount=99;s.meta.daily99Migrated=true}"),
+              ("별도 암기 단계 없이 오늘 학습 80개 안에서 자동으로 다시 출제됩니다.",
+               "별도 암기 단계 없이 오늘 학습 99개 안에서 자동으로 다시 출제됩니다."),
+          ]
+
+          for old, new in replacements:
+              if old not in s:
+                  raise SystemExit(f'Missing expected marker: {old[:100]}')
+              s = s.replace(old, new, 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Validate patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path('index.html').read_text(encoding='utf-8')
+          checks = [
+              "settings:{dailyCount:99,enKoPercent:100}",
+              "daily99Migrated:true",
+              "if(s.meta.daily99Migrated!==true){s.settings.dailyCount=99;s.meta.daily99Migrated=true}",
+              "오늘 학습 99개 안에서 자동으로 다시 출제됩니다.",
+              "const KEY='wm2000_random80_v1'",
+              "Math.min(20,target)",
+          ]
+          for x in checks:
+              if x not in s:
+                  raise SystemExit(f'Validation failed: {x}')
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('index.html').read_text(encoding='utf-8')
+          start=s.rfind('<script>')
+          end=s.find('</script>', start)
+          Path('/tmp/main.js').write_text(s[start+8:end], encoding='utf-8')
+          PY
+          node --check /tmp/main.js
+          git diff --check
+
+      - name: Commit updated app
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Set WordMaster daily learning count to 99"
+            git push origin HEAD:main
+          fi
