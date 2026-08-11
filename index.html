@@ -7,8 +7,8 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="application-name" content="WORD MASTER Auto Sync v7">
-<title>WORD MASTER 수능 2000 · Auto Sync v7</title>
+<meta name="application-name" content="WORD MASTER Auto Sync v8">
+<title>WORD MASTER 수능 2000 · Auto Sync v8</title>
 <meta name="description" content="WORD MASTER 수능 2000 무작위 단어 학습 앱. 진도·오답·학습 이력을 Firebase에 자동 저장합니다.">
 <meta name="robots" content="index,follow,max-image-preview:large">
 <link rel="canonical" href="https://kfcccpro.github.io/random_word2000/">
@@ -121,6 +121,15 @@ button,input,select{font:inherit}button{cursor:pointer}button:disabled{cursor:de
 @media(max-width:820px){
   :root{--sidebar:0px}.app{grid-template-columns:1fr}.sidebar{position:fixed;z-index:80;left:0;right:0;bottom:0;top:auto;width:100%;height:auto;border-right:0;border-top:1px solid var(--line);padding:7px;background:#0e0e10}.brand,.sidebar-bottom{display:none}.nav{grid-template-columns:repeat(var(--nav-count,3),1fr);gap:3px}.nav-btn{flex-direction:column;justify-content:center;gap:2px;text-align:center;padding:8px 3px;font-size:9px}.nav-btn.on::before{left:25%;right:25%;top:auto;bottom:0;width:auto;height:2px}.nav-icon{font-size:18px}.nav-badge{position:absolute;right:11px;top:3px;margin:0}.main{padding:0 15px 88px;max-width:100%}.topbar{padding:15px 0 13px}.page-title{font-size:21px}.top-pill.date{display:none}.hero{padding:30px 18px}.hero-number{font-size:76px}.g3,.g4,.kpi-strip{grid-template-columns:1fr}.rule-grid{grid-template-columns:1fr}.prompt{font-size:37px}.prompt.ko{font-size:25px}.word-row{grid-template-columns:1fr auto}.word-row .m{grid-column:1/-1}.word-row .d{display:none}.section-head{align-items:stretch;flex-direction:column}.search{width:100%;min-width:0}.admin-banner{align-items:flex-start;flex-direction:column}.admin-banner .big-status{text-align:left}.setting-row{align-items:flex-start;flex-direction:column}.count-control{width:100%}.range{flex:1;width:auto}.result-grid{grid-template-columns:1fr}.review-word{font-size:40px}.field-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.learner-switch select{min-width:0;width:100%}}}
 @media(max-width:480px){.login-box{padding:24px 18px}.pin-wrap{flex-direction:column}.login-btn{padding:14px}.login-calendar{gap:3px}.login-day{padding:7px 1px 6px}.login-day .dom{font-size:14px}.login-day .mins{font-size:8px}.top-pill.role{display:none}.hero-number{font-size:68px}.card{padding:18px}}
+
+/* v8: iPad/Safari double-tap zoom suppression. Panning and pinch zoom remain available. */
+html,body,button,.btn,.option,.prompt-card,.nav-btn,.hero,.card{touch-action:manipulation}
+.wrong-memory{max-width:680px;margin:0 auto;padding:18px 0;text-align:center}
+.wrong-memory .memory-label{font-size:13px;font-weight:800;letter-spacing:.12em;color:var(--red-2);margin:16px 0}
+.wrong-memory .memory-word{font-family:var(--display);font-size:clamp(42px,8vw,72px);font-weight:800;letter-spacing:-.04em;margin:28px 0 12px}
+.wrong-memory .memory-mean{font-size:clamp(20px,4vw,30px);font-weight:800;line-height:1.55;color:var(--text);padding:22px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-lg)}
+.wrong-memory .memory-hint{margin-top:18px;color:var(--muted);font-size:13px}
+
 </style>
 <script>
 (()=>{const build='wm-v7-20260806';try{if(localStorage.getItem('wm_app_build')!==build){localStorage.setItem('wm_app_build',build);sessionStorage.removeItem('wm_role')}}catch(e){}})();
@@ -194,23 +203,33 @@ const SEMANTIC_RULES=[
  ['생산·구성',['생산','제조','구성','건설','조직','만들']],['직업·노동',['직업','고용','노동','근무','회사','업무']]
 ];
 
-function defaultState(){return{version:7,createdAt:new Date().toISOString(),settings:{dailyCount:80,enKoPercent:100},meta:{legacyImported:false,updatedAt:new Date().toISOString(),build:'wm-v7-20260806'},wrongDb:{},wordStats:{},dailySets:{},dailyResults:{},startReviewDone:{},startReviewedSources:{},endReviewDone:{},history:[]}}
+
+function defaultState(){return{version:8,createdAt:new Date().toISOString(),settings:{dailyCount:80,enKoPercent:100},meta:{legacyImported:false,updatedAt:new Date().toISOString(),build:'wm-v8-20260811'},wrongDb:{},reviewDb:{},wordStats:{},dailySets:{},dailyResults:{},startReviewDone:{},startReviewedSources:{},endReviewDone:{},history:[]}}
+
 function normalizeState(s){
   const d=defaultState();if(!s||typeof s!=='object')s=d;
   for(const k of Object.keys(d))if(s[k]===undefined)s[k]=d[k];
   if(!s.settings||typeof s.settings!=='object')s.settings={dailyCount:80,enKoPercent:100};
   s.settings.dailyCount=clamp(parseInt(s.settings.dailyCount,10)||0,0,150);
   s.settings.enKoPercent=clamp(parseInt(s.settings.enKoPercent,10),0,100);if(Number.isNaN(s.settings.enKoPercent))s.settings.enKoPercent=100;
-  if(!s.meta)s.meta={legacyImported:false,updatedAt:new Date().toISOString(),build:'v7'};
+  if(!s.meta)s.meta={legacyImported:false,updatedAt:new Date().toISOString(),build:'v8'};
   if(!s.meta.updatedAt)s.meta.updatedAt=s.createdAt||new Date().toISOString();
-  s.meta.build='v7';
+  s.meta.build='v8';
   if(!Array.isArray(s.history))s.history=[];
-  for(const k of ['wrongDb','wordStats','dailySets','dailyResults','startReviewDone','startReviewedSources','endReviewDone'])if(!s[k]||typeof s[k]!=='object')s[k]={};
-  for(const [date,set] of Object.entries(s.dailySets)){if(!set)continue;set.date=set.date||date;set.sessionId=set.sessionId||('set:'+date+':'+(set.createdAt||'legacy'))}
+  for(const k of ['wrongDb','reviewDb','wordStats','dailySets','dailyResults','startReviewDone','startReviewedSources','endReviewDone'])if(!s[k]||typeof s[k]!=='object')s[k]={};
+  // v7 -> v8: historical wrongs enter the review queue once. Daily cap prevents overload.
+  for(const [id,r] of Object.entries(s.wrongDb||{}))if(BY_ID[id]&&(r?.count||0)>0&&!s.reviewDb[id]){
+    const base=/^\d{4}-\d{2}-\d{2}$/.test(String(r.lastWrong||''))?r.lastWrong:localDate();
+    s.reviewDb[id]={active:true,stage:0,dueDate:localDate(),baseDate:base,lastWrong:r.lastWrong||base,lastReview:'',reviewCount:r.reviewCount||0,stableAt:'',updatedAt:new Date().toISOString()};
+  }
+  for(const [id,r] of Object.entries(s.reviewDb||{})){
+    if(!BY_ID[id]||!r){delete s.reviewDb[id];continue}
+    r.active=r.active!==false;r.stage=clamp(parseInt(r.stage,10)||0,0,2);r.dueDate=r.active?(r.dueDate||localDate()):'';r.baseDate=r.baseDate||r.lastWrong||localDate();r.lastReview=r.lastReview||'';r.reviewCount=parseInt(r.reviewCount,10)||0;r.stableAt=r.stableAt||'';r.updatedAt=r.updatedAt||s.meta.updatedAt||new Date().toISOString();
+  }
+  for(const [date,set] of Object.entries(s.dailySets)){if(!set)continue;set.date=set.date||date;set.sessionId=set.sessionId||('set:'+date+':'+(set.createdAt||'legacy'));if(!Array.isArray(set.reviewIds))set.reviewIds=[]}
   for(const [date,res] of Object.entries(s.dailyResults)){if(!res)continue;res.date=res.date||date;res.sessionId=res.sessionId||('session:'+date+':'+(res.startedAt||res.finishedAt||'legacy'))}
   s.history=s.history.filter(Boolean).map((h,i)=>({...h,sessionId:h.sessionId||('history:'+(h.date||'unknown')+':'+(h.startedAt||h.finishedAt||i))}));
-  for(const [reviewDate,done] of Object.entries(s.startReviewDone||{}))if(done){const source=shiftDate(reviewDate,-1);if(source&&!s.startReviewedSources[source])s.startReviewedSources[source]=reviewDate}
-  repairStateDates(s);s.version=7;return s;
+  repairStateDates(s);s.version=8;return s;
 }
 function loadState(){let s;try{s=JSON.parse(localStorage.getItem(KEY))}catch(e){}return normalizeState(s)}
 let S=loadState();
@@ -280,7 +299,7 @@ async function registerCloudDevice(){
   if(!CLOUD_USER||!CLOUD_CLIENT)return;
   const {fb,db}=CLOUD_CLIENT;
   await fb.set(fb.ref(db,`${cloudDevicesPath()}/${deviceId()}`),{
-    deviceId:deviceId(),name:CLOUD.deviceName||'이 기기',learnerName:CLOUD.learnerName||'학습자',lastSeen:fb.serverTimestamp(),role:CURRENT_ROLE||'unknown',platform:navigator.platform||'',userAgent:String(navigator.userAgent||'').slice(0,180),appVersion:7,authType:CLOUD_USER.isAnonymous?'anonymous':'legacy-account'
+    deviceId:deviceId(),name:CLOUD.deviceName||'이 기기',learnerName:CLOUD.learnerName||'학습자',lastSeen:fb.serverTimestamp(),role:CURRENT_ROLE||'unknown',platform:navigator.platform||'',userAgent:String(navigator.userAgent||'').slice(0,180),appVersion:8,authType:CLOUD_USER.isAnonymous?'anonymous':'legacy-account'
   });
 }
 function stateActivityScore(st){let n=(st.history?.length||0)*10000;for(const r of Object.values(st.dailyResults||{}))n+=(r?.finishedAt?5000:0)+(r?.currentIndex||0);for(const x of Object.values(st.wordStats||{}))n+=x?.served||0;return n}
@@ -304,6 +323,7 @@ function sessionDateOf(r,fallback=''){
 
 function laterIso(a,b){return String(a||'')>=String(b||'')?a:b}
 function earlierIso(a,b){if(!a)return b||'';if(!b)return a||'';return String(a)<=String(b)?a:b}
+
 function mergeStateSnapshots(remoteState,localState){
   const R=normalizeState(JSON.parse(JSON.stringify(remoteState||defaultState()))),L=normalizeState(JSON.parse(JSON.stringify(localState||defaultState()))),out=normalizeState(JSON.parse(JSON.stringify(R)));
   const rAct=stateActivityScore(R),lAct=stateActivityScore(L),rTime=Date.parse(R.meta?.updatedAt||'')||0,lTime=Date.parse(L.meta?.updatedAt||'')||0;
@@ -316,6 +336,13 @@ function mergeStateSnapshots(remoteState,localState){
     const a=R.wrongDb?.[id]||{},b=L.wrongDb?.[id]||{};
     out.wrongDb[id]={count:Math.max(a.count||0,b.count||0),firstWrong:earlierIso(a.firstWrong,b.firstWrong),lastWrong:laterIso(a.lastWrong,b.lastWrong),reviewCount:Math.max(a.reviewCount||0,b.reviewCount||0),lastFocusDate:String(a.lastFocusDate||'')>=String(b.lastFocusDate||'')?(a.lastFocusDate||''):(b.lastFocusDate||'')};
   }
+  for(const id of new Set([...Object.keys(R.reviewDb||{}),...Object.keys(L.reviewDb||{})])){
+    const a=R.reviewDb?.[id],b=L.reviewDb?.[id];
+    if(!a){out.reviewDb[id]=JSON.parse(JSON.stringify(b));continue}if(!b){out.reviewDb[id]=JSON.parse(JSON.stringify(a));continue}
+    const at=Date.parse(a.updatedAt||'')||0,bt=Date.parse(b.updatedAt||'')||0;
+    let chosen;if(at!==bt)chosen=at>bt?a:b;else if(!!a.active!==!!b.active)chosen=a.active?a:b;else chosen=(a.stage||0)>=(b.stage||0)?a:b;
+    out.reviewDb[id]=JSON.parse(JSON.stringify(chosen));
+  }
   const dates=new Set([...Object.keys(R.dailyResults||{}),...Object.keys(L.dailyResults||{}),...Object.keys(R.dailySets||{}),...Object.keys(L.dailySets||{})]);
   for(const d of dates){
     const rr=R.dailyResults?.[d],lr=L.dailyResults?.[d],side=chooseResultSide(rr,lr),chosen=side==='local'?lr:rr;
@@ -325,14 +352,10 @@ function mergeStateSnapshots(remoteState,localState){
   }
   for(const k of ['startReviewDone','startReviewedSources','endReviewDone'])out[k]={...(R[k]||{}),...(L[k]||{})};
   const hm=new Map();
-  for(const h of [...(R.history||[]),...(L.history||[])]){
-    if(!h?.date)continue;
-    const key=h.sessionId||('history:'+h.date+':'+(h.startedAt||h.finishedAt||'')),prev=hm.get(key);
-    if(!prev||String(h.finishedAt||'')>String(prev.finishedAt||''))hm.set(key,JSON.parse(JSON.stringify({...h,sessionId:key})));
-  }
+  for(const h of [...(R.history||[]),...(L.history||[])]){if(!h?.date)continue;const key=h.sessionId||('history:'+h.date+':'+(h.startedAt||h.finishedAt||'')),prev=hm.get(key);if(!prev||String(h.finishedAt||'')>String(prev.finishedAt||''))hm.set(key,JSON.parse(JSON.stringify({...h,sessionId:key})))}
   out.history=[...hm.values()].sort((a,b)=>String(b.finishedAt||b.date).localeCompare(String(a.finishedAt||a.date))).slice(0,1200);
   out.createdAt=earlierIso(R.createdAt,L.createdAt)||new Date().toISOString();
-  out.meta={...(R.meta||{}),...(L.meta||{}),updatedAt:new Date(Math.max(rTime,lTime)||Date.now()).toISOString(),build:'v7'};
+  out.meta={...(R.meta||{}),...(L.meta||{}),updatedAt:new Date(Math.max(rTime,lTime)||Date.now()).toISOString(),build:'v8'};
   repairStateDates(out);return normalizeState(out);
 }
 function applyRemoteEnvelope(env,force=false){if(!env?.state)return false;CLOUD_REVISION=Number(env.revision||0);CLOUD.lastSyncAt=new Date(Number(env.updatedAt||Date.now())).toISOString();CLOUD.lastError='';saveCloudConfigLocal();const remote=normalizeState(env.state),merged=mergeStateSnapshots(remote,S),remoteJson=JSON.stringify(remote),mergedJson=JSON.stringify(merged);CLOUD_APPLYING_REMOTE=true;S=merged;localStorage.setItem(KEY,JSON.stringify(S));CLOUD_DIRTY=mergedJson!==remoteJson;CLOUD_APPLYING_REMOTE=false;updateChrome();renderLoginWeek();if(CURRENT_ROLE&&currentView){const keep=currentView;setView(keep)}renderSyncIndicator();if(CLOUD_DIRTY&&!force)queueCloudPush();return true}
@@ -372,7 +395,7 @@ async function cloudPushState(show=false,bootstrapWrite=false){
   CLOUD_USER=user;CLOUD_BUSY=true;renderSyncIndicator();
   try{
     const stateCopy=JSON.parse(JSON.stringify(S)),path=client.fb.ref(client.db,cloudStatePath());
-    const result=await client.fb.runTransaction(path,current=>({state:mergeStateSnapshots(current?.state,stateCopy),revision:Number(current?.revision||0)+1,updatedAt:client.fb.serverTimestamp(),clientUpdatedAt:Date.now(),updatedBy:deviceId(),updatedByName:CLOUD.deviceName||'이 기기',learnerName:CLOUD.learnerName||'학습자',schemaVersion:7}),{applyLocally:false});
+    const result=await client.fb.runTransaction(path,current=>({state:mergeStateSnapshots(current?.state,stateCopy),revision:Number(current?.revision||0)+1,updatedAt:client.fb.serverTimestamp(),clientUpdatedAt:Date.now(),updatedBy:deviceId(),updatedByName:CLOUD.deviceName||'이 기기',learnerName:CLOUD.learnerName||'학습자',schemaVersion:8}),{applyLocally:false});
     if(!result.committed)throw new Error('클라우드 저장이 완료되지 않았습니다.');
     const env=result.snapshot.val();if(env?.state){CLOUD_APPLYING_REMOTE=true;S=normalizeState(env.state);localStorage.setItem(KEY,JSON.stringify(S));CLOUD_APPLYING_REMOTE=false}
     CLOUD_REVISION=Number(env?.revision||CLOUD_REVISION+1);CLOUD.lastSyncAt=new Date().toISOString();CLOUD.lastError='';CLOUD_DIRTY=false;saveCloudConfigLocal();await registerCloudDevice();if(show)toast('모든 기기 진도 동기화 완료');return true;
@@ -494,14 +517,26 @@ function configuredEnKoFor(state=S){const n=parseInt(state.settings?.enKoPercent
 function configuredEnKo(){return configuredEnKoFor(S)}
 function directionCounts(target,pct=configuredEnKo()){const enKo=clamp(Math.round(target*pct/100),0,target);return{enKo,koEn:target-enKo}}
 function buildDirections(target,date,pct=configuredEnKo()){const c=directionCounts(target,pct);return seededShuffle([...Array(c.enKo).fill('en-ko'),...Array(c.koEn).fill('ko-en')],`${date}:directions:${target}:${pct}`)}
+
 function wrongIdsFor(state=S){return Object.keys(state.wrongDb||{}).map(Number).filter(id=>BY_ID[id]&&(state.wrongDb[id]?.count||0)>0)}
 function wrongIds(){return wrongIdsFor(S)}
 function wrongCountFor(state=S){return wrongIdsFor(state).length}
 function wrongCount(){return wrongCountFor(S)}
 function totalWrongEventsFor(state=S){return Object.values(state.wrongDb||{}).reduce((a,r)=>a+(r.count||0),0)}
 function totalWrongEvents(){return totalWrongEventsFor(S)}
+function reviewIdsFor(state=S,activeOnly=true){return Object.keys(state.reviewDb||{}).map(Number).filter(id=>BY_ID[id]&&(!activeOnly||state.reviewDb[id]?.active!==false))}
+function activeReviewCountFor(state=S){return reviewIdsFor(state,true).length}
+function activeReviewCount(){return activeReviewCountFor(S)}
+function stableReviewCountFor(state=S){return Object.values(state.reviewDb||{}).filter(r=>r&&r.active===false&&r.stableAt).length}
+function dueReviewIds(date=localDate(),limit=20,state=S){
+  return reviewIdsFor(state,true).filter(id=>(state.reviewDb[id]?.dueDate||date)<=date).sort((a,b)=>{
+    const A=state.reviewDb[a],B=state.reviewDb[b],ad=A.dueDate||'',bd=B.dueDate||'';if(ad!==bd)return ad.localeCompare(bd);
+    const ac=state.wrongDb[a]?.count||0,bc=state.wrongDb[b]?.count||0;if(ac!==bc)return bc-ac;
+    return String(B.lastWrong||'').localeCompare(String(A.lastWrong||''));
+  }).slice(0,Math.max(0,limit));
+}
+function isScheduledReview(set,id){return Array.isArray(set?.reviewIds)&&set.reviewIds.includes(Number(id))}
 function percent(a,b){return b?Math.round(a/b*100):0}
-
 function semanticFamily(w){const m=w.mean.replace(/\s/g,'');for(const [name,keys] of SEMANTIC_RULES)if(keys.some(k=>m.includes(k)))return name;return''}
 function prefixOf(word){const w=word.toLowerCase();return PREFIXES.find(p=>w.startsWith(p)&&w.length-p.length>=5)||''}
 function suffixOf(word){const w=word.toLowerCase();return SUFFIXES.find(s=>w.endsWith(s)&&w.length-s.length>=4)||''}
@@ -527,23 +562,29 @@ function buildFairMixedSelection(date,target){
 function wrongPriority(date){const buckets={};for(const id of wrongIds()){const r=S.wrongDb[id],k=r.lastFocusDate||'0000-00-00';(buckets[k]||(buckets[k]=[])).push(BY_ID[id])}return Object.keys(buckets).sort().flatMap(k=>seededShuffle(buckets[k].sort((a,b)=>(S.wrongDb[b.id]?.count||0)-(S.wrongDb[a.id]?.count||0)),`${date}:wrong:${k}`))}
 function buildGroupedSelection(priority,candidatePool,seed,target){if(target<=0)return[];const allowed=new Set(candidatePool.map(w=>w.id)),used=new Set(),groups=[];let count=0;const groupedTarget=Math.min(target,Math.max(0,Math.round(target*.62)));const add=(base,withRelations)=>{if(used.has(base.id)||count>=target)return false;const room=target-count;let chosen=[];if(withRelations&&room>1)chosen=relatedCandidates(base,allowed,used).slice(0,Math.min(3,room-1)).map(x=>x.w);if(withRelations&&!chosen.length)return false;const cluster=[base,...chosen];for(const w of cluster)used.add(w.id);groups.push({label:relationLabel(cluster),ids:cluster.map(w=>w.id)});count+=cluster.length;return true};for(const base of seededShuffle(priority,`${seed}:group-pass`)){if(count>=groupedTarget)break;add(base,true)}for(const base of priority){if(count>=target)break;add(base,false)}return groups}
 
+
 function getDailySet(date=localDate()){
   const expected=effectiveDailyCount(date);let existingResult=S.dailyResults[date];
   if(existingResult&&!resultBelongsToDate(existingResult,date)){
-    const actual=sessionDateOf(existingResult,'');
-    if(actual&&actual!==date){S.dailyResults[actual]=existingResult;if(S.dailySets[date])S.dailySets[actual]=S.dailySets[date]}
+    const actual=sessionDateOf(existingResult,'');if(actual&&actual!==date){S.dailyResults[actual]=existingResult;if(S.dailySets[date])S.dailySets[actual]=S.dailySets[date]}
     delete S.dailyResults[date];delete S.dailySets[date];delete S.endReviewDone[date];existingResult=null;save({skipCloud:true});
   }
   if(S.dailySets[date]){
     const set=S.dailySets[date],unstarted=!existingResult||(existingResult.currentIndex||0)===0;
-    if(date===localDate()&&unstarted&&set.ids?.length!==expected){delete S.dailySets[date];delete S.dailyResults[date];delete S.endReviewDone[date]}
-    else{set.target=set.target??set.ids?.length??expected;set.sessionId=set.sessionId||existingResult?.sessionId||('set:'+date+':'+(set.createdAt||Date.now()));if(!Array.isArray(set.directions)||set.directions.length!==set.ids.length)set.directions=buildDirections(set.ids.length,date,set.enKoPercent??configuredEnKo());return set}
+    const needsV8=date===localDate()&&unstarted&&!Array.isArray(set.reviewIds);
+    if(date===localDate()&&unstarted&&(set.ids?.length!==expected||needsV8)){delete S.dailySets[date];delete S.dailyResults[date];delete S.endReviewDone[date]}
+    else{set.target=set.target??set.ids?.length??expected;set.reviewIds=Array.isArray(set.reviewIds)?set.reviewIds:[];set.sessionId=set.sessionId||existingResult?.sessionId||('set:'+date+':'+(set.createdAt||Date.now()));if(!Array.isArray(set.directions)||set.directions.length!==set.ids.length)set.directions=buildDirections(set.ids.length,date,set.enKoPercent??configuredEnKo());return set}
   }
   const target=expected,createdAt=new Date().toISOString(),sessionId='session:'+date+':'+createdAt+':'+Math.random().toString(36).slice(2,8);
-  if(target===0){S.dailySets[date]={date,sessionId,mode:'off',target:0,ids:[],groups:[],directions:[],enKoPercent:configuredEnKo(),catchUp:false,createdAt};save();return S.dailySets[date]}
-  const mode='mixed',groups=buildFairMixedSelection(date,target);
-  const ids=groups.flatMap(g=>g.ids).slice(0,target),enKoPercent=configuredEnKo(),directions=buildDirections(ids.length,date,enKoPercent),catchUp=target===160&&catchUpRequiredFor(S,date);
-  S.dailySets[date]={date,sessionId,mode,target:ids.length,requestedTarget:target,ids,groups,directions,enKoPercent,catchUp,createdAt};save();return S.dailySets[date];
+  if(target===0){S.dailySets[date]={date,sessionId,mode:'off',target:0,ids:[],reviewIds:[],groups:[],directions:[],enKoPercent:configuredEnKo(),catchUp:false,createdAt};save();return S.dailySets[date]}
+  const reviewIds=dueReviewIds(date,Math.min(20,target));
+  const activeSet=new Set(reviewIdsFor(S,true));
+  const tieOrder=seededShuffle(WORDS,`${date}:v8-normal-tie:${target}`),rank=new Map(tieOrder.map((w,i)=>[w.id,i]));
+  const normalTarget=Math.max(0,target-reviewIds.length);
+  const normalIds=WORDS.filter(w=>!activeSet.has(w.id)).sort((a,b)=>{const as=S.wordStats[a.id]?.served||0,bs=S.wordStats[b.id]?.served||0;if(as!==bs)return as-bs;const al=S.wordStats[a.id]?.lastServed||'',bl=S.wordStats[b.id]?.lastServed||'';if(al!==bl)return al.localeCompare(bl);return(rank.get(a.id)||0)-(rank.get(b.id)||0)}).slice(0,normalTarget).map(w=>w.id);
+  const ids=seededShuffle([...reviewIds,...normalIds],`${date}:v8-review-mix:${target}`);
+  const enKoPercent=configuredEnKo(),directions=buildDirections(ids.length,date,enKoPercent),catchUp=target===160&&catchUpRequiredFor(S,date);
+  S.dailySets[date]={date,sessionId,mode:'mixed',target:ids.length,requestedTarget:target,ids,reviewIds,groups:[{label:'오늘 학습',ids:ids.slice()}],directions,enKoPercent,catchUp,createdAt};save();return S.dailySets[date];
 }
 function peekTodaySet(){return S.dailySets[localDate()]||null}
 function groupForIndex(set,index){let p=0;for(let i=0;i<set.groups.length;i++){const g=set.groups[i];if(index<p+g.ids.length)return{...g,no:i+1};p+=g.ids.length}return{label:'개별 단어',no:0,ids:[]}}
@@ -553,7 +594,21 @@ function ensureResult(date=localDate()){
   if(!S.dailyResults[date])S.dailyResults[date]={date,sessionId:set.sessionId||('session:'+date+':'+new Date().toISOString()),mode:set.mode,target:set.ids.length,startedAt:new Date().toISOString(),currentIndex:0,correct:0,answers:[],wrongIds:[],quizFinished:false,finishedAt:''};
   save();return S.dailyResults[date];
 }
-function recordAttempt(id,ok,date){const st=S.wordStats[id]||{served:0,correct:0,wrong:0,lastServed:''};st.served=(st.served||0)+1;st.lastServed=date;if(ok)st.correct=(st.correct||0)+1;else st.wrong=(st.wrong||0)+1;S.wordStats[id]=st;if(!ok){const r=S.wrongDb[id]||{count:0,firstWrong:date,lastWrong:date,reviewCount:0,lastFocusDate:''};r.count=(r.count||0)+1;r.firstWrong=r.firstWrong||date;r.lastWrong=date;S.wrongDb[id]=r}}
+
+function recordAttempt(id,ok,date,isReview=false){
+  const st=S.wordStats[id]||{served:0,correct:0,wrong:0,lastServed:''};st.served=(st.served||0)+1;st.lastServed=date;if(ok)st.correct=(st.correct||0)+1;else st.wrong=(st.wrong||0)+1;S.wordStats[id]=st;
+  if(!ok){
+    const r=S.wrongDb[id]||{count:0,firstWrong:date,lastWrong:date,reviewCount:0,lastFocusDate:''};r.count=(r.count||0)+1;r.firstWrong=r.firstWrong||date;r.lastWrong=date;S.wrongDb[id]=r;
+    const q=S.reviewDb[id]||{};q.active=true;q.stage=0;q.baseDate=date;q.dueDate=shiftDate(date,1);q.lastWrong=date;q.lastReview=isReview?date:(q.lastReview||'');q.reviewCount=(q.reviewCount||0)+(isReview?1:0);q.stableAt='';q.updatedAt=new Date().toISOString();S.reviewDb[id]=q;return;
+  }
+  if(isReview){
+    const q=S.reviewDb[id]||{active:true,stage:0,dueDate:date,baseDate:date,reviewCount:0};q.reviewCount=(q.reviewCount||0)+1;q.lastReview=date;
+    if((q.stage||0)===0){q.stage=1;q.active=true;q.dueDate=shiftDate(date,2)}
+    else if(q.stage===1){q.stage=2;q.active=true;q.dueDate=shiftDate(date,3)}
+    else{q.stage=2;q.active=false;q.dueDate='';q.stableAt=date}
+    q.updatedAt=new Date().toISOString();S.reviewDb[id]=q;if(S.wrongDb[id])S.wrongDb[id].reviewCount=Math.max(S.wrongDb[id].reviewCount||0,q.reviewCount||0);
+  }
+}
 function pendingStartReview(date=localDate()){const candidates=Object.keys(S.dailyResults||{}).filter(d=>d<date).sort().reverse();for(const sourceDate of candidates){const r=S.dailyResults[sourceDate];if(!r?.quizFinished||!r.wrongIds?.length)continue;if(S.startReviewedSources?.[sourceDate])return null;if(S.startReviewDone?.[date]&&sourceDate===shiftDate(date,-1))return null;return{sourceDate,ids:r.wrongIds.filter(id=>BY_ID[id])}}return null}
 function yesterdayWrong(){return pendingStartReview()?.ids||[]}
 function startReviewDue(){return!!pendingStartReview()}
@@ -568,33 +623,40 @@ async function submitPin(){
 }
 function enterRole(role){CURRENT_ROLE=role;document.getElementById('loginScreen').classList.add('hidden');document.getElementById('appShell').classList.remove('hidden');renderNav();document.getElementById('sideRole').textContent=role==='admin'?'관리자 모드':'학습자 모드';document.getElementById('sideMeta').textContent=role==='admin'?'설정 · 진도 · 전체 기록':'오늘 학습 · 오답 확인';document.getElementById('rolePill').textContent=role==='admin'?'ADMIN':'LEARNER';const targetView=role==='admin'?'adminDashboard':'today';setView(targetView);if(cloudConfigured())cloudBootstrap(false).then(ok=>{if(ok&&CURRENT_ROLE===role)setView(targetView)})}
 function logout(){sessionStorage.removeItem('wm_role');CURRENT_ROLE='';clearTimeout(feedbackTimer);document.getElementById('appShell').classList.add('hidden');document.getElementById('loginScreen').classList.remove('hidden');renderLoginWeek();const input=document.getElementById('pinInput');input.value='';setTimeout(()=>input.focus(),30)}
-function renderNav(){const learner=[['today','◉','오늘 학습'],['wrong','×','오답 DB'],['learnerHistory','▤','학습 기록']],admin=[['adminDashboard','◫','대시보드'],['adminHistory','▤','학습 이력'],['adminProgress','◎','진도 관리'],['adminSettings','⚙','설정 · 데이터']],items=CURRENT_ROLE==='admin'?admin:learner,nav=document.getElementById('nav');nav.style.setProperty('--nav-count',items.length);nav.innerHTML=items.map(([v,i,l])=>`<button class="nav-btn" data-view="${v}" onclick="setView('${v}')"><span class="nav-icon">${i}</span><span>${l}</span>${v==='wrong'?`<span class="nav-badge" id="wrongBadge">${wrongCount()}</span>`:''}</button>`).join('')}
-const VIEW_META={today:['오늘 학습','설정된 단어 수만큼 빠르게 반복'],wrong:['오답 DB','틀린 단어는 삭제하지 않고 누적'],learnerHistory:['학습 기록','완료한 세션과 정확도'],adminDashboard:['관리자 대시보드','오늘 진도와 누적 학습 상태'],adminHistory:['학습 이력','세션별 결과 확인 및 내보내기'],adminProgress:['진도 관리','2,000단어별 학습 횟수와 정답률'],adminSettings:['설정 · 데이터','일일 단어 수와 저장 데이터 관리']};
+function renderNav(){const learner=[['today','◉','오늘 학습'],['wrong','↻','복습 단어'],['learnerHistory','▤','학습 기록']],admin=[['adminDashboard','◫','대시보드'],['adminHistory','▤','학습 이력'],['adminProgress','◎','진도 관리'],['adminSettings','⚙','설정 · 데이터']],items=CURRENT_ROLE==='admin'?admin:learner,nav=document.getElementById('nav');nav.style.setProperty('--nav-count',items.length);nav.innerHTML=items.map(([v,i,l])=>`<button class="nav-btn" data-view="${v}" onclick="setView('${v}')"><span class="nav-icon">${i}</span><span>${l}</span>${v==='wrong'?`<span class="nav-badge" id="wrongBadge">${activeReviewCount()}</span>`:''}</button>`).join('')}
+const VIEW_META={today:['오늘 학습','설정된 단어 수만큼 빠르게 반복'],wrong:['복습 단어','틀린 단어는 D+1 · D+3 · D+6으로 자동 복습'],learnerHistory:['학습 기록','완료한 세션과 정확도'],adminDashboard:['관리자 대시보드','오늘 진도와 누적 학습 상태'],adminHistory:['학습 이력','세션별 결과 확인 및 내보내기'],adminProgress:['진도 관리','2,000단어별 학습 횟수와 정답률'],adminSettings:['설정 · 데이터','일일 단어 수와 저장 데이터 관리']};
 function setView(name){clearTimeout(feedbackTimer);quizLocked=false;currentView=name;document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));const el=document.getElementById('view'+name[0].toUpperCase()+name.slice(1));if(!el)return;el.classList.add('on');document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('on',b.dataset.view===name));document.getElementById('pageTitle').textContent=VIEW_META[name][0];document.getElementById('pageSub').textContent=VIEW_META[name][1];document.getElementById('datePill').textContent=dateLabel(localDate());if(name==='today')renderToday();else if(name==='wrong')renderWrong();else if(name==='learnerHistory')renderLearnerHistory();else if(name==='adminDashboard')renderAdminDashboard();else if(name==='adminHistory')renderAdminHistory();else if(name==='adminProgress')renderAdminProgress();else if(name==='adminSettings')renderAdminSettings();updateChrome();window.scrollTo({top:0,behavior:'smooth'})}
-function updateChrome(){const badge=document.getElementById('wrongBadge');if(badge){badge.textContent=wrongCount();badge.style.display=wrongCount()?'':'none'}const datePill=document.getElementById('datePill');if(datePill)datePill.textContent=dateLabel(localDate());renderLoginWeek()}
+function updateChrome(){const badge=document.getElementById('wrongBadge');if(badge){badge.textContent=activeReviewCount();badge.style.display=activeReviewCount()?'':'none'}const datePill=document.getElementById('datePill');if(datePill)datePill.textContent=dateLabel(localDate());renderLoginWeek()}
+
 
 function renderToday(){
-  reviewState=null;
-  const root=document.getElementById('viewToday');
-  let existing=peekTodaySet(),res=getResult();
+  reviewState=null;const root=document.getElementById('viewToday');let existing=peekTodaySet(),res=getResult();
   if(existing&&(!res||(res.currentIndex||0)===0)&&existing.ids?.length!==effectiveDailyCount())existing=getDailySet();
-  const target=existing?existing.ids.length:effectiveDailyCount(),n=wrongCount(),due=startReviewDue(),catchup=existing?.catchUp??catchUpRequiredFor();
+  const target=existing?existing.ids.length:effectiveDailyCount(),catchup=existing?.catchUp??catchUpRequiredFor();
   if(res&&!res.quizFinished&&res.currentIndex>0){renderQuiz();return}
-  if(endReviewDue()){startReview('today');return}
-  if(target===0){
-    root.innerHTML=`${due?`<div class="alert"><b>최근 오답 상기 대기:</b> 마지막 학습 오답을 한 번 확인할 수 있습니다.</div>`:''}<div class="hero"><div class="hero-inner"><div class="mode-line"><span class="mode-dot"></span>오늘 배정 없음</div><div class="hero-kicker">TODAY'S SET</div><div class="hero-number">0</div><div class="hero-desc">관리자가 오늘 학습량을 0개로 설정했습니다.</div>${due?`<button class="btn btn-primary big" onclick="startReview('yesterday')">최근 오답 상기</button>`:`<button class="btn btn-secondary big" disabled>오늘 학습 없음</button>`}</div></div>`;
-    return;
-  }
-  const set=existing||getDailySet(),actual=set.ids.length,mode=set.mode,done=todayCompleted(),progress=res?percent(res.currentIndex,actual):0,thresholdLeft=Math.max(0,actual+1-n),dc=directionCounts(actual,set.enKoPercent??configuredEnKo());
-  const cta=done?'오늘 결과 보기':due?'최근 오답 상기부터 시작':res?'학습 계속하기':`${actual}개 학습 시작`;
-  const action=done?'showResult()':due?"startReview('yesterday')":'startQuiz()';
-  root.innerHTML=`${catchup?`<div class="alert danger-note"><b>매일 학습 보충:</b> 어제 학습을 완료하지 않아 오늘 목표가 자동으로 160개로 조정되었습니다.</div>`:''}${due?`<div class="alert"><b>시작 전 복습:</b> 마지막 학습에서 틀린 ${yesterdayWrong().length}개를 한 번 상기한 뒤 오늘 학습이 시작됩니다.</div>`:''}<div class="hero"><div class="hero-inner"><div class="mode-line"><span class="mode-dot ${mode==='wrong-only'?'red':''}"></span>${mode==='wrong-only'?`오답 집중 · 오답 DB에서 ${actual}개`:catchup?'160개 보충 학습 · 전체 DB 균등 순환':'전체 DB 균등 순환 · 최근 출제 단어 후순위'}</div><div class="hero-kicker">TODAY'S SET</div><div class="hero-number">${actual}</div><div class="hero-desc">영→한 ${dc.enKo}개 · 한→영 ${dc.koEn}개. PC와 아이패드 진도는 자동으로 공유됩니다.</div><button class="btn btn-primary big" onclick="${action}">${cta}</button>${done?`<div style="margin-top:10px"><button class="btn btn-secondary" onclick="startExtraSession()">새로운 ${actual}개 추가 학습</button></div>`:''}</div></div><div class="grid g3" style="margin-bottom:15px"><div class="card"><div class="stat-label">오늘 진행</div><div class="stat-value">${res?.currentIndex||0}<span style="font-size:15px;color:var(--dim)"> / ${actual}</span></div><div class="progress"><i style="width:${progress}%"></i></div></div><div class="card"><div class="stat-label">누적 오답 단어</div><div class="stat-value ${n>actual?'red':''}">${n}</div><div class="stat-note">${n>actual?'오답 집중 모드 활성':`집중 모드까지 ${thresholdLeft}개`}</div></div><div class="card"><div class="stat-label">기기 동기화</div><div class="stat-value" style="font-size:22px">${cloudSignedIn()?'ON':'LOCAL'}</div><div class="stat-note">${cloudSignedIn()?'동일 진도 사용':'연결 시 자동 병합'}</div></div></div>`;
+  if(target===0){root.innerHTML=`<div class="hero"><div class="hero-inner"><div class="mode-line"><span class="mode-dot"></span>오늘 배정 없음</div><div class="hero-kicker">TODAY'S SET</div><div class="hero-number">0</div><div class="hero-desc">관리자가 오늘 학습량을 0개로 설정했습니다.</div><button class="btn btn-secondary big" disabled>오늘 학습 없음</button></div></div>`;return}
+  const set=existing||getDailySet(),actual=set.ids.length,done=todayCompleted(),progress=res?percent(res.currentIndex,actual):0,dc=directionCounts(actual,set.enKoPercent??configuredEnKo()),reviewN=set.reviewIds?.length||0,activeN=activeReviewCount();
+  const cta=done?'오늘 결과 보기':res?'학습 계속하기':`${actual}개 학습 시작`,action=done?'showResult()':'startQuiz()';
+  root.innerHTML=`${catchup?`<div class="alert danger-note"><b>매일 학습 보충:</b> 어제 학습을 완료하지 않아 오늘 목표가 자동으로 160개로 조정되었습니다.</div>`:''}<div class="hero"><div class="hero-inner"><div class="mode-line"><span class="mode-dot"></span>오늘 학습 ${actual}개 · 복습 ${reviewN} · 일반 ${actual-reviewN}</div><div class="hero-kicker">TODAY'S SET</div><div class="hero-number">${actual}</div><div class="hero-desc">복습은 별도 학습으로 추가되지 않고 오늘 ${actual}개 안에 자동으로 섞입니다. PC와 아이패드 진도는 자동 공유됩니다.</div><button class="btn btn-primary big" onclick="${action}">${cta}</button>${done?`<div style="margin-top:10px"><button class="btn btn-secondary" onclick="startExtraSession()">새로운 ${actual}개 추가 학습</button></div>`:''}</div></div><div class="grid g3" style="margin-bottom:15px"><div class="card"><div class="stat-label">오늘 진행</div><div class="stat-value">${res?.currentIndex||0}<span style="font-size:15px;color:var(--dim)"> / ${actual}</span></div><div class="progress"><i style="width:${progress}%"></i></div></div><div class="card"><div class="stat-label">현재 복습 필요</div><div class="stat-value ${activeN?'red':''}">${activeN}</div><div class="stat-note">오늘 배정 최대 20개 · 안정화되면 자동 졸업</div></div><div class="card"><div class="stat-label">기기 동기화</div><div class="stat-value" style="font-size:22px">${cloudSignedIn()?'ON':'LOCAL'}</div><div class="stat-note">${cloudSignedIn()?'동일 진도 사용':'연결 시 자동 병합'}</div></div></div>`;
 }
-function startQuiz(){if(startReviewDue()){startReview('yesterday');return}const set=getDailySet();if(!set.ids.length){renderToday();return}ensureResult();renderQuiz()}
+
+function startQuiz(){const set=getDailySet();if(!set.ids.length){renderToday();return}ensureResult();renderQuiz()}
 function makeQuestion(index){const set=getDailySet(),id=set.ids[index],w=BY_ID[id],direction=set.directions?.[index]||'en-ko',correct=direction==='en-ko'?w.mean:w.word,family=semanticFamily(w);let pool=WORDS.filter(x=>x.id!==id&&(direction==='en-ko'?x.mean!==correct:x.word!==correct));pool=pool.sort((a,b)=>{const af=family&&semanticFamily(a)===family?1:0,bf=family&&semanticFamily(b)===family?1:0,ar=relationScore(w,a),br=relationScore(w,b);return(bf*5+br)-(af*5+ar)});const near=pool.slice(0,30),sessionPool=set.ids.map(x=>BY_ID[x]).filter(x=>x.id!==id),mix=seededShuffle([...near,...sessionPool,...pool],`${localDate()}:${index}:opts`),vals=[];for(const x of mix){const v=direction==='en-ko'?x.mean:x.word;if(v!==correct&&!vals.includes(v))vals.push(v);if(vals.length===3)break}return{w,direction,correct,options:seededShuffle([correct,...vals],`${localDate()}:${index}:order`)}}
-function renderQuiz(){const root=document.getElementById('viewToday'),set=getDailySet(),res=ensureResult(),target=set.ids.length;if(res.currentIndex>=target){finishQuiz();return}const index=res.currentIndex,q=makeQuestion(index),g=groupForIndex(set,index);quizLocked=false;root.innerHTML=`<div class="quiz-wrap"><div class="quiz-head"><span class="tag">묶음 ${g.no} · ${escapeHtml(g.label)}</span><span class="quiz-count">${index+1} / ${target}</span></div><div class="progress"><i style="width:${percent(index,target)}%"></i></div><div class="prompt-card"><div class="prompt-label">${q.direction==='en-ko'?'ENGLISH → KOREAN':'KOREAN → ENGLISH'}</div><div class="prompt ${q.direction==='ko-en'?'ko':''}">${escapeHtml(q.direction==='en-ko'?q.w.word:q.w.mean)}</div><div class="prompt-hint">가장 알맞은 답을 선택하세요.</div></div><div class="options">${q.options.map((o,i)=>`<button class="option" onclick="answerQuestion(${i})">${escapeHtml(o)}<span class="option-key">${i+1}</span></button>`).join('')}</div><div class="feedback" id="feedback"></div></div>`;window.scrollTo({top:0,behavior:'smooth'})}
-function answerQuestion(optionIndex){if(quizLocked)return;quizLocked=true;const res=ensureResult(),set=getDailySet(),index=res.currentIndex,q=makeQuestion(index),buttons=[...document.querySelectorAll('.option')],selected=q.options[optionIndex],ok=selected===q.correct,date=localDate();buttons.forEach((b,i)=>{b.disabled=true;if(q.options[i]===q.correct)b.classList.add('correct');if(i===optionIndex&&!ok)b.classList.add('wrong')});recordAttempt(q.w.id,ok,date);if(ok)res.correct++;else if(!res.wrongIds.includes(q.w.id))res.wrongIds.push(q.w.id);res.answers[index]={id:q.w.id,direction:q.direction,ok,selected,answeredAt:new Date().toISOString()};res.currentIndex=index+1;save();updateChrome();const fb=document.getElementById('feedback');fb.className='feedback '+(ok?'ok':'bad');fb.textContent=ok?'정답':`오답 · 정답: ${q.correct}`;feedbackTimer=setTimeout(()=>{if(res.currentIndex>=set.ids.length)finishQuiz();else renderQuiz()},ok?420:2800)}
-function finishQuiz(){const res=ensureResult();res.quizFinished=true;save();if(res.wrongIds.length)startReview('today');else{completeSession();showResult()}}
+function renderQuiz(){const root=document.getElementById('viewToday'),set=getDailySet(),res=ensureResult(),target=set.ids.length;if(res.currentIndex>=target){finishQuiz();return}const index=res.currentIndex,q=makeQuestion(index),g=groupForIndex(set,index),scheduled=isScheduledReview(set,q.w.id);quizLocked=false;root.innerHTML=`<div class="quiz-wrap"><div class="quiz-head"><span class="tag">묶음 ${g.no} · ${escapeHtml(g.label)}</span><span class="quiz-count">${index+1} / ${target}</span></div><div class="progress"><i style="width:${percent(index,target)}%"></i></div><div class="prompt-card"><div class="prompt-label">${q.direction==='en-ko'?'ENGLISH → KOREAN':'KOREAN → ENGLISH'}</div><div class="prompt ${q.direction==='ko-en'?'ko':''}">${escapeHtml(q.direction==='en-ko'?q.w.word:q.w.mean)}</div><div class="prompt-hint">가장 알맞은 답을 선택하세요.</div></div><div class="options">${q.options.map((o,i)=>`<button class="option" onclick="answerQuestion(${i})">${escapeHtml(o)}<span class="option-key">${i+1}</span></button>`).join('')}</div><div class="feedback" id="feedback"></div></div>`;window.scrollTo({top:0,behavior:'smooth'})}
+
+function advanceAfterAnswer(){const res=ensureResult(),set=getDailySet();if(res.currentIndex>=set.ids.length)finishQuiz();else renderQuiz()}
+function showWrongMemory(w){
+  const root=document.getElementById('viewToday');root.innerHTML=`<div class="wrong-memory"><div class="memory-label">한 번만 기억하기</div><div class="memory-word">${escapeHtml(w.word)}</div><div class="memory-mean">${escapeHtml(w.mean)}</div><div class="memory-hint">잠시 보고 있으면 자동으로 다음 문제로 넘어갑니다.</div></div>`;
+  feedbackTimer=setTimeout(advanceAfterAnswer,4000);window.scrollTo({top:0,behavior:'smooth'});
+}
+function answerQuestion(optionIndex){
+  if(quizLocked)return;quizLocked=true;const res=ensureResult(),set=getDailySet(),index=res.currentIndex,q=makeQuestion(index),buttons=[...document.querySelectorAll('.option')],selected=q.options[optionIndex],ok=selected===q.correct,date=localDate(),scheduled=isScheduledReview(set,q.w.id);
+  buttons.forEach((b,i)=>{b.disabled=true;if(q.options[i]===q.correct)b.classList.add('correct');if(i===optionIndex&&!ok)b.classList.add('wrong')});
+  recordAttempt(q.w.id,ok,date,scheduled);if(ok)res.correct++;else if(!res.wrongIds.includes(q.w.id))res.wrongIds.push(q.w.id);res.answers[index]={id:q.w.id,direction:q.direction,ok,selected,scheduledReview:scheduled,answeredAt:new Date().toISOString()};res.currentIndex=index+1;save();updateChrome();
+  const fb=document.getElementById('feedback');fb.className='feedback '+(ok?'ok':'bad');fb.textContent=ok?'정답':`오답 · 정답: ${q.correct}`;
+  if(ok)feedbackTimer=setTimeout(advanceAfterAnswer,420);else feedbackTimer=setTimeout(()=>showWrongMemory(q.w),3000);
+}
+function finishQuiz(){const res=ensureResult();res.quizFinished=true;save();completeSession();showResult()}
 function startReview(type){clearTimeout(feedbackTimer);quizLocked=false;const pending=type==='yesterday'?pendingStartReview():null,ids=type==='yesterday'?(pending?.ids||[]):(getResult()?.wrongIds||[]);if(!ids.length){if(type==='yesterday'){S.startReviewDone[localDate()]=true;save();if(effectiveDailyCount()>0)startQuiz();else renderToday()}else{completeSession();showResult()}return}reviewState={type,ids,index:0,sourceDate:pending?.sourceDate||''};renderReview()}
 function renderReview(){const root=document.getElementById('viewToday'),r=reviewState,w=BY_ID[r.ids[r.index]],title=r.type==='yesterday'?'최근 오답 상기':'오늘 오답 마무리',desc=r.type==='yesterday'?'마지막 학습에서 틀린 단어를 테스트 없이 한 번 확인합니다.':'오늘 틀린 단어를 한 번 확인하면 학습이 완료됩니다.';root.innerHTML=`<div class="review-wrap"><div class="section-head"><div><div class="section-title">${title}</div><div class="section-sub">${desc}</div></div><div class="quiz-count">${r.index+1} / ${r.ids.length}</div></div><div class="progress"><i style="width:${percent(r.index+1,r.ids.length)}%"></i></div><div class="review-card"><div class="review-word">${escapeHtml(w.word)}</div><div class="review-mean">${escapeHtml(w.mean)}</div><div class="review-meta">철자와 뜻을 함께 보고 한 번만 상기합니다.</div></div><div class="review-actions"><button class="btn btn-secondary" onclick="reviewPrev()" ${r.index===0?'disabled':''}>이전</button><button class="btn btn-primary" onclick="reviewNext()">${r.index===r.ids.length-1?'복습 완료':'다음'}</button></div></div>`;window.scrollTo({top:0,behavior:'smooth'})}
 function reviewPrev(){if(reviewState&&reviewState.index>0){reviewState.index--;renderReview()}}
@@ -610,7 +672,7 @@ function completeSession(){
 function showResult(){
   const root=document.getElementById('viewToday'),res=getResult(),set=getDailySet();if(!res){renderToday();return}
   const target=set.ids.length,pct=percent(res.correct,target);
-  root.innerHTML=`<div class="result"><div class="result-icon">${pct>=90?'◎':pct>=70?'◇':'○'}</div><div class="result-title">오늘 학습 완료</div><div class="result-score">${pct}%</div><div style="color:var(--muted);font-size:12px">${res.correct}개 정답 · ${res.wrongIds.length}개 오답 · ${durationLabel({startedAt:res.startedAt,finishedAt:res.finishedAt})}</div><div class="result-grid"><div class="result-cell"><b>${res.correct}</b><span>정답</span></div><div class="result-cell"><b style="color:#ff6569">${res.wrongIds.length}</b><span>오늘 오답</span></div><div class="result-cell"><b>${wrongCount()}</b><span>누적 오답 DB</span></div></div><div class="card" style="text-align:left"><div class="section-title">진도 저장 완료</div><div class="section-sub" style="margin-top:7px">이번 세트의 결과는 누적 진도에 보존됩니다. 다음 출제는 학습 횟수와 최근 출제일을 함께 반영합니다.</div><div class="section-sub" style="margin-top:8px">세션 모드: ${set.mode==='wrong-only'?'오답 집중':'전체 DB 순환'} · 목표 ${target}개</div></div><div style="display:grid;gap:10px;margin-top:16px"><button class="btn btn-primary big wide" onclick="startExtraSession()">새로운 ${effectiveDailyCount()}개 추가 학습</button><button class="btn btn-secondary wide" onclick="setView('learnerHistory')">누적 학습 기록 보기</button></div></div>`;
+  root.innerHTML=`<div class="result"><div class="result-icon">${pct>=90?'◎':pct>=70?'◇':'○'}</div><div class="result-title">오늘 학습 완료</div><div class="result-score">${pct}%</div><div style="color:var(--muted);font-size:12px">${res.correct}개 정답 · ${res.wrongIds.length}개 오답 · ${durationLabel({startedAt:res.startedAt,finishedAt:res.finishedAt})}</div><div class="result-grid"><div class="result-cell"><b>${res.correct}</b><span>정답</span></div><div class="result-cell"><b style="color:#ff6569">${res.wrongIds.length}</b><span>오늘 오답</span></div><div class="result-cell"><b>${activeReviewCount()}</b><span>현재 복습 필요</span></div></div><div class="card" style="text-align:left"><div class="section-title">진도 저장 완료</div><div class="section-sub" style="margin-top:7px">이번 세트의 결과는 누적 진도에 보존됩니다. 다음 출제는 학습 횟수와 최근 출제일을 함께 반영합니다.</div><div class="section-sub" style="margin-top:8px">복습 ${set.reviewIds?.length||0}개 포함 · 목표 ${target}개</div></div><div style="display:grid;gap:10px;margin-top:16px"><button class="btn btn-primary big wide" onclick="startExtraSession()">새로운 ${effectiveDailyCount()}개 추가 학습</button><button class="btn btn-secondary wide" onclick="setView('learnerHistory')">누적 학습 기록 보기</button></div></div>`;
 }
 function startExtraSession(){
   const date=localDate(),res=getResult(date);if(res&&!res.finishedAt){startQuiz();return}
@@ -619,11 +681,14 @@ function startExtraSession(){
 }
 
 
-function renderWrong(){const root=document.getElementById('viewWrong'),ids=wrongIds().sort((a,b)=>(S.wrongDb[b].count||0)-(S.wrongDb[a].count||0)||String(S.wrongDb[b].lastWrong).localeCompare(String(S.wrongDb[a].lastWrong))),n=ids.length,target=configuredCount();root.innerHTML=`<div class="grid g3" style="margin-bottom:15px"><div class="card"><div class="stat-label">누적 오답 단어</div><div class="stat-value red">${n}</div><div class="stat-note">한 번이라도 틀린 고유 단어</div></div><div class="card"><div class="stat-label">총 오답 발생</div><div class="stat-value">${totalWrongEvents()}</div><div class="stat-note">반복 오답 포함</div></div><div class="card"><div class="stat-label">현재 출제 기준</div><div class="stat-value" style="font-size:22px">${target>0&&n>target?'오답 전용':'전체 순환'}</div><div class="stat-note">오답 ${n}개 / 기준 ${target}개</div></div></div><div class="card"><div class="section-head"><div><div class="section-title">오답 단어 목록</div><div class="section-sub">기록은 자동 삭제되지 않습니다.</div></div><input class="search" id="wrongSearch" placeholder="단어 또는 뜻 검색" oninput="filterWrong()"></div><div id="wrongList"></div></div>`;wrongPage=1;drawWrongList(ids,'')}
-function filterWrong(){wrongPage=1;const q=document.getElementById('wrongSearch').value.trim().toLowerCase(),ids=wrongIds().filter(id=>{const w=BY_ID[id];return w.word.toLowerCase().includes(q)||w.mean.toLowerCase().includes(q)}).sort((a,b)=>(S.wrongDb[b].count||0)-(S.wrongDb[a].count||0));drawWrongList(ids,q)}
-function drawWrongList(ids,q){const per=50,pages=Math.max(1,Math.ceil(ids.length/per));wrongPage=clamp(wrongPage,1,pages);const slice=ids.slice((wrongPage-1)*per,wrongPage*per),box=document.getElementById('wrongList');if(!box)return;if(!slice.length){box.innerHTML=`<div class="empty"><div class="empty-icon">○</div>${q?'검색 결과가 없습니다.':'아직 오답이 없습니다.'}</div>`;return}box.innerHTML=`<div class="list">${slice.map(id=>{const w=BY_ID[id],r=S.wrongDb[id];return`<div class="word-row"><div class="w">${escapeHtml(w.word)}</div><div class="m">${escapeHtml(w.mean)}</div><div class="c">${r.count}회</div><div class="d">최근 ${escapeHtml(r.lastWrong||'-')}</div></div>`}).join('')}</div><div class="pager"><button class="btn btn-secondary small" onclick="changeWrongPage(-1)" ${wrongPage===1?'disabled':''}>이전</button><span>${wrongPage} / ${pages}</span><button class="btn btn-secondary small" onclick="changeWrongPage(1)" ${wrongPage===pages?'disabled':''}>다음</button></div>`;box.dataset.ids=ids.join(',')}
-function changeWrongPage(delta){const box=document.getElementById('wrongList'),ids=(box.dataset.ids||'').split(',').filter(Boolean).map(Number);wrongPage+=delta;drawWrongList(ids,'')}
 
+function renderWrong(){
+  const root=document.getElementById('viewWrong'),ids=reviewIdsFor(S,true).sort((a,b)=>String(S.reviewDb[a]?.dueDate||'').localeCompare(String(S.reviewDb[b]?.dueDate||''))||(S.wrongDb[b]?.count||0)-(S.wrongDb[a]?.count||0)),active=ids.length,stable=stableReviewCountFor(),historical=wrongCount();
+  root.innerHTML=`<div class="grid g3" style="margin-bottom:15px"><div class="card"><div class="stat-label">현재 복습 필요</div><div class="stat-value red">${active}</div><div class="stat-note">오늘은 최대 20개만 자동 출제</div></div><div class="card"><div class="stat-label">안정화 완료</div><div class="stat-value">${stable}</div><div class="stat-note">D+1 · D+3 · D+6 확인 통과</div></div><div class="card"><div class="stat-label">과거 오답 이력</div><div class="stat-value">${historical}</div><div class="stat-note">현재 실력과 분리해 보관</div></div></div><div class="card"><div class="section-head"><div><div class="section-title">복습이 필요한 단어</div><div class="section-sub">별도 암기 단계 없이 오늘 학습 80개 안에서 자동으로 다시 출제됩니다.</div></div><input class="search" id="wrongSearch" placeholder="단어 또는 뜻 검색" oninput="filterWrong()"></div><div id="wrongList"></div></div>`;wrongPage=1;drawWrongList(ids,'')
+}
+function filterWrong(){wrongPage=1;const q=document.getElementById('wrongSearch').value.trim().toLowerCase(),ids=reviewIdsFor(S,true).filter(id=>{const w=BY_ID[id];return w.word.toLowerCase().includes(q)||w.mean.toLowerCase().includes(q)}).sort((a,b)=>String(S.reviewDb[a]?.dueDate||'').localeCompare(String(S.reviewDb[b]?.dueDate||''))||(S.wrongDb[b]?.count||0)-(S.wrongDb[a]?.count||0));drawWrongList(ids,q)}
+function drawWrongList(ids,q){const per=50,pages=Math.max(1,Math.ceil(ids.length/per));wrongPage=clamp(wrongPage,1,pages);const slice=ids.slice((wrongPage-1)*per,wrongPage*per),box=document.getElementById('wrongList');if(!box)return;if(!slice.length){box.innerHTML=`<div class="empty"><div class="empty-icon">○</div>${q?'검색 결과가 없습니다.':'현재 복습이 필요한 단어가 없습니다.'}</div>`;return}box.innerHTML=`<div class="list">${slice.map(id=>{const w=BY_ID[id],r=S.wrongDb[id]||{},v=S.reviewDb[id]||{},step=(v.stage||0)===0?'D+1':v.stage===1?'D+3':'D+6';return`<div class="word-row"><div class="w">${escapeHtml(w.word)}</div><div class="m">${escapeHtml(w.mean)}</div><div class="c">${step}</div><div class="d">예정 ${escapeHtml(v.dueDate||'-')} · 오답 ${r.count||0}회</div></div>`}).join('')}</div><div class="pager"><button class="btn btn-secondary small" onclick="changeWrongPage(-1)" ${wrongPage===1?'disabled':''}>이전</button><span>${wrongPage} / ${pages}</span><button class="btn btn-secondary small" onclick="changeWrongPage(1)" ${wrongPage===pages?'disabled':''}>다음</button></div>`;box.dataset.ids=ids.join(',')}
+function changeWrongPage(delta){const box=document.getElementById('wrongList'),ids=(box.dataset.ids||'').split(',').filter(Boolean).map(Number);wrongPage+=delta;drawWrongList(ids,'')}
 function historyRowHtml(h){const acc=percent(h.correct,h.total),dc={enKo:h.enKo??Math.round((h.total||0)*configuredEnKoFor(adminState())/100),koEn:h.koEn??((h.total||0)-Math.round((h.total||0)*configuredEnKoFor(adminState())/100))};return`<tr><td class="strong">${escapeHtml(h.date)}</td><td>${h.mode==='wrong-only'?'오답 집중':'전체 순환'}</td><td>${h.total||0}</td><td>${dc.enKo}</td><td>${dc.koEn}</td><td class="good">${h.correct||0}</td><td class="bad">${h.wrong||0}</td><td>${acc}%</td><td>${formatDateTime(h.finishedAt)}</td></tr>`}
 function renderLearnerHistory(){const root=document.getElementById('viewLearnerHistory'),hist=S.history;root.innerHTML=`<div class="card"><div class="section-head"><div><div class="section-title">완료 학습 기록</div><div class="section-sub">최근 완료 세션부터 표시합니다.</div></div><span class="tag">총 ${hist.length}회</span></div>${hist.length?`<div class="table-wrap"><table class="data-table"><thead><tr><th>날짜</th><th>모드</th><th>학습량</th><th>영→한</th><th>한→영</th><th>정답</th><th>오답</th><th>정확도</th><th>완료 시각</th></tr></thead><tbody>${hist.slice(0,60).map(historyRowHtml).join('')}</tbody></table></div>`:`<div class="empty"><div class="empty-icon">▤</div>완료된 학습 기록이 없습니다.</div>`}</div>`}
 
@@ -698,6 +763,9 @@ async function bootApp(){
   renderLoginWeek();
 }
 window.addEventListener('pageshow',()=>checkDateRollover(true));window.addEventListener('focus',()=>checkDateRollover(false));document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDateRollover(true)});setInterval(()=>checkDateRollover(false),30000);bootApp();
+
+if(navigator.maxTouchPoints>0){document.addEventListener('dblclick',e=>{if(e.target.closest('button,.option,.prompt-card,.btn,.nav-btn,.hero,.card'))e.preventDefault()},{passive:false})}
+
 </script>
 </body>
 </html>
