@@ -226,7 +226,7 @@ function normalizeState(s){
     if(!BY_ID[id]||!r){delete s.reviewDb[id];continue}
     r.active=r.active!==false;r.stage=clamp(parseInt(r.stage,10)||0,0,2);r.dueDate=r.active?(r.dueDate||localDate()):'';r.baseDate=r.baseDate||r.lastWrong||localDate();r.lastReview=r.lastReview||'';r.reviewCount=parseInt(r.reviewCount,10)||0;r.stableAt=r.stableAt||'';r.updatedAt=r.updatedAt||s.meta.updatedAt||new Date().toISOString();
   }
-  for(const [date,set] of Object.entries(s.dailySets)){if(!set)continue;set.date=set.date||date;set.sessionId=set.sessionId||('set:'+date+':'+(set.createdAt||'legacy'));if(!Array.isArray(set.reviewIds))set.reviewIds=[]}
+  for(const [date,set] of Object.entries(s.dailySets)){if(!set)continue;set.date=set.date||date;set.sessionId=set.sessionId||('set:'+date+':'+(set.createdAt||'legacy'));if(!Array.isArray(set.reviewIds))set.reviewIds=[];if(set.reviewPlanVersion===undefined)set.reviewPlanVersion=0}
   for(const [date,res] of Object.entries(s.dailyResults)){if(!res)continue;res.date=res.date||date;res.sessionId=res.sessionId||('session:'+date+':'+(res.startedAt||res.finishedAt||'legacy'))}
   s.history=s.history.filter(Boolean).map((h,i)=>({...h,sessionId:h.sessionId||('history:'+(h.date||'unknown')+':'+(h.startedAt||h.finishedAt||i))}));
   repairStateDates(s);s.version=8;return s;
@@ -571,12 +571,12 @@ function getDailySet(date=localDate()){
   }
   if(S.dailySets[date]){
     const set=S.dailySets[date],unstarted=!existingResult||(existingResult.currentIndex||0)===0;
-    const needsV8=date===localDate()&&unstarted&&!Array.isArray(set.reviewIds);
+    const needsV8=date===localDate()&&unstarted&&set.reviewPlanVersion!==8;
     if(date===localDate()&&unstarted&&(set.ids?.length!==expected||needsV8)){delete S.dailySets[date];delete S.dailyResults[date];delete S.endReviewDone[date]}
     else{set.target=set.target??set.ids?.length??expected;set.reviewIds=Array.isArray(set.reviewIds)?set.reviewIds:[];set.sessionId=set.sessionId||existingResult?.sessionId||('set:'+date+':'+(set.createdAt||Date.now()));if(!Array.isArray(set.directions)||set.directions.length!==set.ids.length)set.directions=buildDirections(set.ids.length,date,set.enKoPercent??configuredEnKo());return set}
   }
   const target=expected,createdAt=new Date().toISOString(),sessionId='session:'+date+':'+createdAt+':'+Math.random().toString(36).slice(2,8);
-  if(target===0){S.dailySets[date]={date,sessionId,mode:'off',target:0,ids:[],reviewIds:[],groups:[],directions:[],enKoPercent:configuredEnKo(),catchUp:false,createdAt};save();return S.dailySets[date]}
+  if(target===0){S.dailySets[date]={date,sessionId,mode:'off',target:0,ids:[],reviewIds:[],reviewPlanVersion:8,groups:[],directions:[],enKoPercent:configuredEnKo(),catchUp:false,createdAt};save();return S.dailySets[date]}
   const reviewIds=dueReviewIds(date,Math.min(20,target));
   const activeSet=new Set(reviewIdsFor(S,true));
   const tieOrder=seededShuffle(WORDS,`${date}:v8-normal-tie:${target}`),rank=new Map(tieOrder.map((w,i)=>[w.id,i]));
@@ -584,7 +584,7 @@ function getDailySet(date=localDate()){
   const normalIds=WORDS.filter(w=>!activeSet.has(w.id)).sort((a,b)=>{const as=S.wordStats[a.id]?.served||0,bs=S.wordStats[b.id]?.served||0;if(as!==bs)return as-bs;const al=S.wordStats[a.id]?.lastServed||'',bl=S.wordStats[b.id]?.lastServed||'';if(al!==bl)return al.localeCompare(bl);return(rank.get(a.id)||0)-(rank.get(b.id)||0)}).slice(0,normalTarget).map(w=>w.id);
   const ids=seededShuffle([...reviewIds,...normalIds],`${date}:v8-review-mix:${target}`);
   const enKoPercent=configuredEnKo(),directions=buildDirections(ids.length,date,enKoPercent),catchUp=target===160&&catchUpRequiredFor(S,date);
-  S.dailySets[date]={date,sessionId,mode:'mixed',target:ids.length,requestedTarget:target,ids,reviewIds,groups:[{label:'오늘 학습',ids:ids.slice()}],directions,enKoPercent,catchUp,createdAt};save();return S.dailySets[date];
+  S.dailySets[date]={date,sessionId,mode:'mixed',target:ids.length,requestedTarget:target,ids,reviewIds,reviewPlanVersion:8,groups:[{label:'오늘 학습',ids:ids.slice()}],directions,enKoPercent,catchUp,createdAt};save();return S.dailySets[date];
 }
 function peekTodaySet(){return S.dailySets[localDate()]||null}
 function groupForIndex(set,index){let p=0;for(let i=0;i<set.groups.length;i++){const g=set.groups[i];if(index<p+g.ids.length)return{...g,no:i+1};p+=g.ids.length}return{label:'개별 단어',no:0,ids:[]}}
