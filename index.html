@@ -152,7 +152,7 @@ html,body,button,.btn,.option,.prompt-card,.nav-btn,.hero,.card{touch-action:man
       <input id="pinInput" class="pin-input" type="password" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="접속 코드" placeholder="••••">
       <button class="login-btn" onclick="submitPin()">ENTER</button>
     </div>
-    <div class="login-note">최근 7일은 완료 학습만 표시합니다. 어제를 빠뜨리면 오늘 학습량은 자동으로 160개가 됩니다.</div>
+    <div class="login-note">최근 7일은 실제 풀이 기록을 기준으로 미학습 · 진행 · 완료를 구분합니다. 어제 실제 풀이가 전혀 없을 때만 보충 학습이 적용됩니다.</div>
   </div>
 </div>
 
@@ -476,9 +476,38 @@ function repairStateDates(state){
   return state;
 }
 function resultBelongsToDate(r,date){if(!r)return false;return sessionDateOf(r,date)===date}
-function completedStudyDates(state=S){const out=new Set();for(const h of state.history||[])if(h?.date&&h.finishedAt)out.add(h.date);for(const [date,r] of Object.entries(state.dailyResults||{}))if(r?.finishedAt)out.add(date);return out}
-function hasPriorCompletedStudy(state,date){for(const d of completedStudyDates(state))if(d<date)return true;return false}
-function catchUpRequiredFor(state=S,date=localDate()){const base=configuredCountFor(state);if(base<=0)return false;const yesterday=shiftDate(date,-1);if(!yesterday||!hasPriorCompletedStudy(state,date))return false;if(state.dailySets?.[yesterday]?.target===0)return false;return !completedStudyDates(state).has(yesterday)}
+function studyAnsweredFor(state=S,date=localDate()){
+  const r=state.dailyResults?.[date];
+  const byResult=Math.max(Number(r?.currentIndex)||0,Array.isArray(r?.answers)?r.answers.filter(Boolean).length:0);
+  let byWords=0;for(const x of Object.values(state.wordStats||{}))if(x?.lastServed===date&&(x?.served||0)>0)byWords++;
+  return Math.max(byResult,byWords);
+}
+function studyTargetFor(state=S,date=localDate()){return Number(state.dailySets?.[date]?.ids?.length||state.dailySets?.[date]?.target||state.dailyResults?.[date]?.target||configuredCountFor(state)||0)}
+function completedStudyDates(state=S){
+  const out=new Set();
+  for(const h of state.history||[])if(h?.date&&(h.finishedAt||Number(h.total)>0))out.add(h.date);
+  for(const [date,r] of Object.entries(state.dailyResults||{})){const answered=studyAnsweredFor(state,date),target=studyTargetFor(state,date);if(r?.finishedAt||r?.quizFinished||(target>0&&answered>=target))out.add(date)}
+  return out;
+}
+function studyDayStatusFor(state=S,date=localDate()){
+  if(state.dailySets?.[date]?.target===0)return{kind:'off',answered:0,target:0};
+  const answered=studyAnsweredFor(state,date),target=studyTargetFor(state,date),done=completedStudyDates(state).has(date);
+  if(done)return{kind:'done',answered:Math.max(answered,target||0),target};
+  if(answered>0)return{kind:'partial',answered,target};
+  return{kind:'none',answered:0,target};
+}
+function hasPriorStudy(state,date){
+  for(const d of completedStudyDates(state))if(d<date)return true;
+  for(const d of Object.keys(state.dailyResults||{}))if(d<date&&studyAnsweredFor(state,d)>0)return true;
+  for(const x of Object.values(state.wordStats||{}))if(/^\d{4}-\d{2}-\d{2}$/.test(String(x?.lastServed||''))&&x.lastServed<date)return true;
+  return false;
+}
+function catchUpRequiredFor(state=S,date=localDate()){
+  const base=configuredCountFor(state);if(base<=0)return false;
+  const yesterday=shiftDate(date,-1);if(!yesterday||!hasPriorStudy(state,date))return false;
+  const y=studyDayStatusFor(state,yesterday);if(y.kind==='off')return false;
+  return y.kind==='none';
+}
 function effectiveDailyCountFor(state=S,date=localDate()){const base=configuredCountFor(state);if(base<=0)return 0;return catchUpRequiredFor(state,date)?160:base}
 function effectiveDailyCount(date=localDate()){return effectiveDailyCountFor(S,date)}
 function renderLoginWeek(){
@@ -496,16 +525,17 @@ function renderLoginWeek(){
     root.innerHTML=dates.map(date=>{const d=dateObject(date);return `<div class="login-day${date===today?' today':''}"><span class="dow">${dows[d.getDay()]}</span><span class="dom">${d.getDate()}</span><span class="mins">···</span></div>`}).join('');
     summary.textContent='공유 진도 확인 중';notice.className='login-catchup hidden';return;
   }
-  const today=localDate(),hist=new Map((S.history||[]).map(h=>[h.date,h])),completed=completedStudyDates(S),dates=[...Array(7)].map((_,i)=>shiftDate(today,i-6)),allCompleted=[...completed].sort(),first=allCompleted[0]||'',dows=['일','월','화','수','목','금','토'];
+  const today=localDate(),hist=new Map((S.history||[]).map(h=>[h.date,h])),completed=completedStudyDates(S),dates=[...Array(7)].map((_,i)=>shiftDate(today,i-6)),studyDates=dates.filter(date=>studyDayStatusFor(S,date).kind!=='none'),first=studyDates[0]||'',dows=['일','월','화','수','목','금','토'];
   root.innerHTML=dates.map(date=>{
-    const d=dateObject(date),row=hist.get(date),isToday=date===today,isDone=completed.has(date),off=S.dailySets?.[date]?.target===0,missed=!isToday&&!isDone&&!off&&first&&date>=first;
-    let cls='login-day'+(isToday?' today':'')+(isDone?' done':'')+(missed?' missed':'')+(off?' off':'');
-    let label=isDone?durationLabel(row||S.dailyResults?.[date]):off?'OFF':isToday?(S.dailyResults?.[date]?.currentIndex?'진행':'오늘'):missed?'미학습':'–';
+    const d=dateObject(date),row=hist.get(date),isToday=date===today,status=studyDayStatusFor(S,date),isDone=status.kind==='done',partial=status.kind==='partial',off=status.kind==='off',missed=!isToday&&status.kind==='none'&&first&&date>=first;
+    let cls='login-day'+(isToday?' today':'')+(isDone?' done':'')+(partial?' partial':'')+(missed?' missed':'')+(off?' off':'');
+    let label=isDone?(row?`완료 · ${durationLabel(row)}`:'완료'):partial?`진행 ${status.answered}/${status.target||configuredCount()}`:off?'OFF':isToday?'오늘':missed?'미학습':'–';
     return `<div class="${cls}" title="${escapeHtml(date)} ${escapeHtml(label)}"><span class="dow">${dows[d.getDay()]}</span><span class="dom">${d.getDate()}</span><span class="mins">${escapeHtml(label)}</span></div>`;
   }).join('');
-  const y=hist.get(shiftDate(today,-1)),b=hist.get(shiftDate(today,-2)),parts=[];if(y)parts.push(`어제 ${durationLabel(y)}`);if(b)parts.push(`그저께 ${durationLabel(b)}`);summary.textContent=parts.length?parts.join(' · '):'완료한 날에 소요 시간이 표시됩니다.';
+  const describe=date=>{const st=studyDayStatusFor(S,date),row=hist.get(date);if(st.kind==='done')return row?`완료 · ${durationLabel(row)}`:'완료';if(st.kind==='partial')return`진행 ${st.answered}/${st.target||configuredCount()}`;if(st.kind==='off')return'OFF';return'미학습'};
+  const parts=[`어제 ${describe(shiftDate(today,-1))}`,`그저께 ${describe(shiftDate(today,-2))}`];summary.textContent=parts.join(' · ');
   const catchup=catchUpRequiredFor(S,today),done=completed.has(today);notice.className='login-catchup'+(catchup&&done?' done':'')+((catchup||done&&S.dailySets?.[today]?.catchUp)?'':' hidden');
-  if(catchup)notice.textContent=done?'오늘 160개 보충 학습을 완료했습니다.':'어제 학습 기록이 없어 오늘은 자동으로 160개가 출제됩니다.';else if(done&&S.dailySets?.[today]?.catchUp)notice.textContent='오늘 160개 보충 학습을 완료했습니다.';
+  if(catchup)notice.textContent=done?'오늘 160개 보충 학습을 완료했습니다.':'어제 실제 풀이 기록이 없어 오늘은 자동으로 160개가 출제됩니다.';else if(done&&S.dailySets?.[today]?.catchUp)notice.textContent='오늘 160개 보충 학습을 완료했습니다.';
 }
 
 function escapeHtml(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
