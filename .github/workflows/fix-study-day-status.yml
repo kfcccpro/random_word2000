@@ -29,39 +29,45 @@ jobs:
           old = """function completedStudyDates(state=S){const out=new Set();for(const h of state.history||[])if(h?.date&&h.finishedAt)out.add(h.date);for(const [date,r] of Object.entries(state.dailyResults||{}))if(r?.finishedAt)out.add(date);return out}\nfunction hasPriorCompletedStudy(state,date){for(const d of completedStudyDates(state))if(d<date)return true;return false}\nfunction catchUpRequiredFor(state=S,date=localDate()){const base=configuredCountFor(state);if(base<=0)return false;const yesterday=shiftDate(date,-1);if(!yesterday||!hasPriorCompletedStudy(state,date))return false;if(state.dailySets?.[yesterday]?.target===0)return false;return !completedStudyDates(state).has(yesterday)}\nfunction effectiveDailyCountFor(state=S,date=localDate()){const base=configuredCountFor(state);if(base<=0)return 0;return catchUpRequiredFor(state,date)?160:base}\n"""
           new = """function studyAnsweredFor(state=S,date=localDate()){\n  const r=state.dailyResults?.[date];\n  const byResult=Math.max(Number(r?.currentIndex)||0,Array.isArray(r?.answers)?r.answers.filter(Boolean).length:0);\n  let byWords=0;for(const x of Object.values(state.wordStats||{}))if(x?.lastServed===date&&(x?.served||0)>0)byWords++;\n  return Math.max(byResult,byWords);\n}\nfunction studyTargetFor(state=S,date=localDate()){return Number(state.dailySets?.[date]?.ids?.length||state.dailySets?.[date]?.target||state.dailyResults?.[date]?.target||configuredCountFor(state)||0)}\nfunction completedStudyDates(state=S){\n  const out=new Set();\n  for(const h of state.history||[])if(h?.date&&(h.finishedAt||Number(h.total)>0))out.add(h.date);\n  for(const [date,r] of Object.entries(state.dailyResults||{})){const answered=studyAnsweredFor(state,date),target=studyTargetFor(state,date);if(r?.finishedAt||r?.quizFinished||(target>0&&answered>=target))out.add(date)}\n  return out;\n}\nfunction studyDayStatusFor(state=S,date=localDate()){\n  if(state.dailySets?.[date]?.target===0)return{kind:'off',answered:0,target:0};\n  const answered=studyAnsweredFor(state,date),target=studyTargetFor(state,date),done=completedStudyDates(state).has(date);\n  if(done)return{kind:'done',answered:Math.max(answered,target||0),target};\n  if(answered>0)return{kind:'partial',answered,target};\n  return{kind:'none',answered:0,target};\n}\nfunction hasPriorStudy(state,date){\n  for(const d of completedStudyDates(state))if(d<date)return true;\n  for(const d of Object.keys(state.dailyResults||{}))if(d<date&&studyAnsweredFor(state,d)>0)return true;\n  for(const x of Object.values(state.wordStats||{}))if(/^\\d{4}-\\d{2}-\\d{2}$/.test(String(x?.lastServed||''))&&x.lastServed<date)return true;\n  return false;\n}\nfunction catchUpRequiredFor(state=S,date=localDate()){\n  const base=configuredCountFor(state);if(base<=0)return false;\n  const yesterday=shiftDate(date,-1);if(!yesterday||!hasPriorStudy(state,date))return false;\n  const y=studyDayStatusFor(state,yesterday);if(y.kind==='off')return false;\n  return y.kind==='none';\n}\nfunction effectiveDailyCountFor(state=S,date=localDate()){const base=configuredCountFor(state);if(base<=0)return 0;return catchUpRequiredFor(state,date)?160:base}\n"""
           if old not in s:
-              raise SystemExit('study status function marker missing')
-          s = s.replace(old,new,1)
+              if 'function studyDayStatusFor' not in s:
+                  raise SystemExit('study status function marker missing')
+          else:
+              s = s.replace(old,new,1)
 
           old2 = """  const today=localDate(),hist=new Map((S.history||[]).map(h=>[h.date,h])),completed=completedStudyDates(S),dates=[...Array(7)].map((_,i)=>shiftDate(today,i-6)),allCompleted=[...completed].sort(),first=allCompleted[0]||'',dows=['일','월','화','수','목','금','토'];\n  root.innerHTML=dates.map(date=>{\n    const d=dateObject(date),row=hist.get(date),isToday=date===today,isDone=completed.has(date),off=S.dailySets?.[date]?.target===0,missed=!isToday&&!isDone&&!off&&first&&date>=first;\n    let cls='login-day'+(isToday?' today':'')+(isDone?' done':'')+(missed?' missed':'')+(off?' off':'');\n    let label=isDone?durationLabel(row||S.dailyResults?.[date]):off?'OFF':isToday?(S.dailyResults?.[date]?.currentIndex?'진행':'오늘'):missed?'미학습':'–';\n    return `<div class=\"${cls}\" title=\"${escapeHtml(date)} ${escapeHtml(label)}\"><span class=\"dow\">${dows[d.getDay()]}</span><span class=\"dom\">${d.getDate()}</span><span class=\"mins\">${escapeHtml(label)}</span></div>`;\n  }).join('');\n  const y=hist.get(shiftDate(today,-1)),b=hist.get(shiftDate(today,-2)),parts=[];if(y)parts.push(`어제 ${durationLabel(y)}`);if(b)parts.push(`그저께 ${durationLabel(b)}`);summary.textContent=parts.length?parts.join(' · '):'완료한 날에 소요 시간이 표시됩니다.';\n  const catchup=catchUpRequiredFor(S,today),done=completed.has(today);notice.className='login-catchup'+(catchup&&done?' done':'')+((catchup||done&&S.dailySets?.[today]?.catchUp)?'':' hidden');\n  if(catchup)notice.textContent=done?'오늘 160개 보충 학습을 완료했습니다.':'어제 학습 기록이 없어 오늘은 자동으로 160개가 출제됩니다.';else if(done&&S.dailySets?.[today]?.catchUp)notice.textContent='오늘 160개 보충 학습을 완료했습니다.';\n"""
           new2 = """  const today=localDate(),hist=new Map((S.history||[]).map(h=>[h.date,h])),completed=completedStudyDates(S),dates=[...Array(7)].map((_,i)=>shiftDate(today,i-6)),studyDates=dates.filter(date=>studyDayStatusFor(S,date).kind!=='none'),first=studyDates[0]||'',dows=['일','월','화','수','목','금','토'];\n  root.innerHTML=dates.map(date=>{\n    const d=dateObject(date),row=hist.get(date),isToday=date===today,status=studyDayStatusFor(S,date),isDone=status.kind==='done',partial=status.kind==='partial',off=status.kind==='off',missed=!isToday&&status.kind==='none'&&first&&date>=first;\n    let cls='login-day'+(isToday?' today':'')+(isDone?' done':'')+(partial?' partial':'')+(missed?' missed':'')+(off?' off':'');\n    let label=isDone?(row?`완료 · ${durationLabel(row)}`:'완료'):partial?`진행 ${status.answered}/${status.target||configuredCount()}`:off?'OFF':isToday?'오늘':missed?'미학습':'–';\n    return `<div class=\"${cls}\" title=\"${escapeHtml(date)} ${escapeHtml(label)}\"><span class=\"dow\">${dows[d.getDay()]}</span><span class=\"dom\">${d.getDate()}</span><span class=\"mins\">${escapeHtml(label)}</span></div>`;\n  }).join('');\n  const describe=date=>{const st=studyDayStatusFor(S,date),row=hist.get(date);if(st.kind==='done')return row?`완료 · ${durationLabel(row)}`:'완료';if(st.kind==='partial')return`진행 ${st.answered}/${st.target||configuredCount()}`;if(st.kind==='off')return'OFF';return'미학습'};\n  const parts=[`어제 ${describe(shiftDate(today,-1))}`,`그저께 ${describe(shiftDate(today,-2))}`];summary.textContent=parts.join(' · ');\n  const catchup=catchUpRequiredFor(S,today),done=completed.has(today);notice.className='login-catchup'+(catchup&&done?' done':'')+((catchup||done&&S.dailySets?.[today]?.catchUp)?'':' hidden');\n  if(catchup)notice.textContent=done?'오늘 160개 보충 학습을 완료했습니다.':'어제 실제 풀이 기록이 없어 오늘은 자동으로 160개가 출제됩니다.';else if(done&&S.dailySets?.[today]?.catchUp)notice.textContent='오늘 160개 보충 학습을 완료했습니다.';\n"""
-          if old2 not in s:
+          if old2 in s:
+              s = s.replace(old2,new2,1)
+          elif 'studyDates=dates.filter' not in s:
               raise SystemExit('login week marker missing')
-          s = s.replace(old2,new2,1)
 
           old3 = '<div class="login-note">최근 7일은 완료 학습만 표시합니다. 어제를 빠뜨리면 오늘 학습량은 자동으로 160개가 됩니다.</div>'
           new3 = '<div class="login-note">최근 7일은 실제 풀이 기록을 기준으로 미학습 · 진행 · 완료를 구분합니다. 어제 실제 풀이가 전혀 없을 때만 보충 학습이 적용됩니다.</div>'
-          if old3 not in s:
+          if old3 in s:
+              s = s.replace(old3,new3,1)
+          elif new3 not in s:
               raise SystemExit('login note marker missing')
-          s = s.replace(old3,new3,1)
 
           p.write_text(s,encoding='utf-8')
           PY
 
       - name: Add partial-day style
         run: |
-          cat >> wordmaster-ui-v9.css <<'CSS'
+          if ! grep -Fq '.login-day.partial' wordmaster-ui-v9.css; then
+            cat >> wordmaster-ui-v9.css <<'CSS'
 
           /* v9.1: distinguish partial study from missed study */
           .login-day.partial{background:#eef2f5;border-color:#c6d0d7;color:#536878}
           .login-day.partial .mins{color:#536878;font-weight:760}
           CSS
+          fi
 
       - name: Validate
         run: |
-          grep -F "function studyDayStatusFor" index.html
-          grep -F "진행 ${status.answered}/${status.target||configuredCount()}" index.html
-          grep -F "어제 실제 풀이가 전혀 없을 때만 보충 학습이 적용됩니다." index.html
-          grep -F ".login-day.partial" wordmaster-ui-v9.css
+          grep -F 'function studyDayStatusFor' index.html
+          grep -F 'studyDates=dates.filter' index.html
+          grep -F '어제 실제 풀이가 전혀 없을 때만 보충 학습이 적용됩니다.' index.html
+          grep -F '.login-day.partial' wordmaster-ui-v9.css
           python3 - <<'PY'
           from pathlib import Path
           s=Path('index.html').read_text(encoding='utf-8')
